@@ -9,3 +9,6 @@
 
 ### Demo edited video
 ![Demo edited video](demo/demo_edit_video.gif)
+
+### Demo Face Detection video
+![Demo Face Detection video](demo/demo_face_detection_video.gif)
