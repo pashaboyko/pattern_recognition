@@ -1,13 +1,10 @@
-## Lab3
-
-### Brisk and Akaze
-
-### XGBoost
-
-### Результати 
+# Lab3
 
 
-### Akaze + XGBoost Result Video
+## Результати 
+
+
+## Akaze + XGBoost Result Video
 
 ![Found](xgb_model_akaze_with_notebook.gif)
 
