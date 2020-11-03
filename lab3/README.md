@@ -1,10 +1,4 @@
-## Lab3
-
-### Brisk and Akaze
-
-### XGBoost
-
-### Результати 
+# Lab3
 
 
 ### Akaze + XGBoost Result Video
