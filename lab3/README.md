@@ -1,10 +1,7 @@
 # Lab3
 
 
-## Результати 
-
-
-## Akaze + XGBoost Result Video
+### Akaze + XGBoost Result Video
 
 ![Found](xgb_model_akaze_with_notebook.gif)
 
