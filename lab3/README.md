@@ -4,7 +4,7 @@
 ### Akaze + XGBoost Result Video
 
 ## !!! ADD New video xgb_model_akaze_with_notebook_1.avi
-
+![NEW](NEW.gif)
 
 ![Found](xgb_model_akaze_with_notebook.gif)
 
