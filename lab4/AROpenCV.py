@@ -14,17 +14,24 @@ import subprocess as sp
 import multiprocessing as mp
 from os import remove
 
-def detect_match(query_img, train_img, min_match_count):
-    query_image = query_img
+#akaze = cv2.ORB_create(nfeatures=1000)
+akaze = cv2.AKAZE_create()
+#akaze = cv2.BRISK_create()
+
+def detect_match(query_img, train_img, min_match_count, keypoints1, descriptors1):
+    start_time_3 = time.time()
     train_image = train_img
-    akaze = cv2.AKAZE_create()
-    keypoints1, descriptors1 = akaze.detectAndCompute(query_image, None)  # передаємо зображення і маску
     keypoints2, descriptors2 = akaze.detectAndCompute(train_image, None)
+
+    end_time_3 = time.time()
+    total_processing_time_3 = end_time_3 - start_time_3
+    print("Время3: {}".format(total_processing_time_3))
     msed = np.inf
     if not (isinstance(descriptors1, np.float32) & isinstance(descriptors2,
                                                               np.float32)):  # нам потрібно np.float32, тому ми перевіряємо тип
         descriptors1 = np.float32(descriptors1)
         descriptors2 = np.float32(descriptors2)
+
 
     flann_idx = 1
     index_params = dict(algorithm=flann_idx, trees=5)
@@ -32,8 +39,10 @@ def detect_match(query_img, train_img, min_match_count):
 
     # -- Step 2: Matching descriptor vectors with a FLANN based matcher
     # Since SURF is a floating-point descriptor NORM_L2 is used
-    flann = cv2.FlannBasedMatcher(index_params, search_params)
-    matches = flann.knnMatch(descriptors1, descriptors2, k=2)
+    bf = cv2.BFMatcher()
+    matches = bf.knnMatch(descriptors1, descriptors2, k=2)
+    #flann = cv2.FlannBasedMatcher(index_params, search_params)
+    #matches = flann.knnMatch(descriptors1, descriptors2, k=2)
     # -- Filter matches using the Lowe's ratio test
     ratio_thresh = 0.7
     good_matches = [m for m, n in matches if m.distance < ratio_thresh * n.distance]
@@ -68,6 +77,37 @@ def detect_match(query_img, train_img, min_match_count):
     return keypoints1, keypoints2, good_matches, matchesMask, M, dst
 
 # imgTarget = cv2.drawKeypoints(imgTarget, kp1, None)
+
+def image_resize(image, width = None, height = None, inter = cv2.INTER_AREA):
+    # initialize the dimensions of the image to be resized and
+    # grab the image size
+    dim = None
+    (h, w) = image.shape[:2]
+
+    # if both the width and height are None, then return the
+    # original image
+    if width is None and height is None:
+        return image
+
+    # check to see if the width is None
+    if width is None:
+        # calculate the ratio of the height and construct the
+        # dimensions
+        r = height / float(h)
+        dim = (int(w * r), height)
+
+    # otherwise, the height is None
+    else:
+        # calculate the ratio of the width and construct the
+        # dimensions
+        r = width / float(w)
+        dim = (width, int(h * r))
+
+    # resize the image
+    resized = cv2.resize(image, dim, interpolation = inter)
+
+    # return the resized image
+    return resized
 def stackImages(scale,imgArray):
     rows = len(imgArray)
     cols = len(imgArray[0])
@@ -100,41 +140,43 @@ def stackImages(scale,imgArray):
     return ver
 
 def fun():
-        a_a = False;
         cap = cv2.VideoCapture(2)
         imgTarget = cv2.imread('target.jpg')
         myVid = cv2.VideoCapture('video.mp4')
 
+        #imgTarget = image_resize(imgTarget, height=600)
+        #cap = cv2.VideoCapture('IMG_8767.MOV')
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        print("Frames per second using video.get(cv2.CAP_PROP_FPS) : {0}".format(fps))
+        start = time.time()
         succesqs, imgVideo = myVid.read()
 
         hT, wT, cT = imgTarget.shape
         imgVideo = cv2.resize(imgVideo,(wT,hT))
         detection = False
         frameCounter = 0
+        keypoints1, descriptors1 = akaze.detectAndCompute(imgTarget, None)
         time.sleep(1)
         loaded_model = pickle.load(open("pima.pickle.dat", "rb"))
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
 
-        print(frame_width)
-        print(frame_height)
-
+        out = cv2.VideoWriter("out.avi", cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30,
+                              (frame_width, frame_height))
         k = 0
+        total_processing_time = 0
         while(cap.isOpened()):
 
-
-
-            print("Обработка видео с использованием одного процесса...")
-            start_time = time.time()
             success, imgWebcam = cap.read()
+
             if success == True:
-                if k % 5 == 0:
+                if k%3==0:
+                    start_time = time.time()
 
-
+                    imgWebcam = image_resize(imgWebcam, height = 800)
 
                     imgStacked = imgWebcam
                     imgAug = imgWebcam.copy()
-
 
                     if detection == False:
                         myVid.set(cv2.CAP_PROP_POS_FRAMES,0)
@@ -146,23 +188,33 @@ def fun():
                         success, imgVideo = myVid.read()
                         imgVideo = cv2.resize(imgVideo, (wT, hT))
 
+                    start_time_2 = time.time()
+                    kp1, kp2, match, inlier, matrix, dst = detect_match(query_img= imgTarget,
+                                                             train_img=imgWebcam,
+                                                             min_match_count=10, keypoints1=keypoints1, descriptors1=descriptors1)
+                    end_time_2 = time.time()
+                    total_processing_time_2 = end_time_2 - start_time_2
+                    print("Время2: {}".format(total_processing_time_2))
 
-                    kp1, kp2, match, inlier, matrix, dst = detect_match(query_img= cv2.cvtColor(imgTarget, cv2.COLOR_BGR2GRAY),
-                                                             train_img=cv2.cvtColor(imgWebcam, cv2.COLOR_BGR2GRAY),
-                                                             min_match_count=10)
+                    start_time_4 = time.time()
+
                     if match == 0:
                         match = np.inf
+
 
                     inliers_matches_akaze_test = dict()
                     inliers_matches_akaze_test = [[] for i in range(1)]
                     inliers_matches_akaze_test[0].append((np.sum(inlier) / (len(match))))
-                    for i in range(len(inliers_matches_akaze_test)):
-                        for j in range(len(inliers_matches_akaze_test[i])):
-                            if (math.isnan(inliers_matches_akaze_test[i][j])):
-                                inliers_matches_akaze_test[i][j] = 0.0
+                    if (math.isnan(inliers_matches_akaze_test[0][0])):
+                                inliers_matches_akaze_test[0][0] = 0.0
                     y_pred = loaded_model.predict(np.array(inliers_matches_akaze_test))
-                    if y_pred == 1:
 
+                    end_time_4 = time.time()
+                    total_processing_time_4 = end_time_4 - start_time_4
+                    print("Время4: {}".format(total_processing_time_4))
+                    start_time_5 = time.time()
+                    if y_pred == 1:
+                        print("aaaaaa")
                         detection = True
                         imgWarp = cv2.warpPerspective(imgVideo, matrix, (imgWebcam.shape[1], imgWebcam.shape[0]))
 
@@ -172,34 +224,57 @@ def fun():
                         imgAug = cv2.bitwise_and(imgAug, imgAug, mask=maskInv)
                         imgAug = cv2.bitwise_or(imgWarp, imgAug)
 
+                        img2 = cv2.polylines(imgWebcam, [np.int32(dst)], True, (255, 0, 255), 3)
                         imgStacked = stackImages(0.5, ([imgWebcam, imgVideo],[imgWarp, imgAug]))
 
+                        fps = 3 / (total_processing_time)
+                    out.write(imgStacked)
 
                     #cv2.imshow('maskNew', maskNew)
                     #cv2.imshow('maskNew', maskNew)
                     #cv2.imshow('imgWarp', imgWarp)
-                    #cv2.imshow('img2', img2)
+
                     #cv2.imshow('imgFeatures', imgFeatures)
                     #cv2.imshow('Imgtarget', imgTarget)
                     #cv2.imshow('myVid', imgVideo)
                     #cv2.imshow('myWebcam', imgWebcam)
 
+                end_time = time.time()
+                if(k%3==0):
+                    total_processing_time = total_processing_time + end_time - start_time
+                    fps = 3 / (total_processing_time)
+                else:
+                    total_processing_time =  end_time - start_time
 
+                str = "FPS : %0.1f" % fps
+
+                cv2.putText(imgStacked, str, (0, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0))
                 cv2.imshow('imgStacked', imgStacked)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                          break
+
+                cv2.waitKey(1)
                 frameCounter +=1
+                end_time_5 = time.time()
+                total_processing_time_5 = end_time_5 - start_time_5
+                print("Время5: {}".format(total_processing_time_5))
                 end_time = time.time()
                 total_processing_time = end_time - start_time
-                print("Время: {}".format(total_processing_time))
-                k = k + 1
+                print("Время1: {}".format(total_processing_time))
 
             else:
                 end_time = time.time()
                 total_processing_time = end_time - start_time
-                print("Время: {}".format(total_processing_time))
+                print("Время1: {}".format(total_processing_time))
                 break
+        end = time.time()
+        seconds = end - start
+
+        print("Time taken : {0} seconds".format(seconds))
+
+        fps = num_frames / seconds
+        print("Estimated frames per second : {0}".format(fps))
+
         cap.release()
+        out.release()
         cv2.destroyAllWindows()
 
 
